@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  video_player: ^2.10.0
+  flutter_svg: ^2.0.11+1
+  custom_navigation_bar: ^0.8.2
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -39,6 +42,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -52,21 +56,22 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  uses-material-design: true
+
   assets:
     - assets/image/
+    - assets/videos/
 
   fonts:
     - family: Mycoustomfont
       fonts:
-      - asset: assets/fonts/amita-bold.ttf
+        - asset: assets/fonts/amita-bold.ttf
 
 
 
 
-    # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
-  uses-material-design: true
+
+
 
   # To add assets to your application, add an assets section, like this:
   # assets:
