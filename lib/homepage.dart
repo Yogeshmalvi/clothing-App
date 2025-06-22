@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:custom_navigation_bar/custom_navigation_bar.dart'; // Import CustomNavigationBar
+import 'dart:async'; // Import for Timer
+import 'package:custom_navigation_bar/custom_navigation_bar.dart';
+
+import 'cart.dart'; // Import the CartPageContent from cart.dart
+import 'explore.dart'; // Import the new ExplorePageContent
+import 'profile.dart'; // <--- ADD THIS IMPORT for ProfilePageContent
 
 void main() {
   runApp(const MyApp());
@@ -39,14 +43,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final PageController _mainPageController = PageController(initialPage: 0);
 
-  final PageController _imageSliderPageController = PageController(initialPage: 0);
+  final PageController _imageSliderPageController =
+  PageController(initialPage: 0);
   int _currentImageSliderIndex = 0;
 
-  int _selectedIndex = 0;
+  Timer? _sliderTimer; // Declare the Timer for auto-sliding
 
-  // For CustomNavigationBar badges
-  final List<int> _badgeCounts = [0, 0, 0, 0, 0]; // Corresponds to the 5 items
-  final List<bool> _badgeShows = [false, false, false, false, false];
+  int _selectedIndex = 0; // 0: Home, 1: Cart, 2: Explore, 3: Me
+
+  // For CustomNavigationBar badges - Adjusted for 4 items (Home, Cart, Explore, Me)
+  final List<int> _badgeCounts = [0, 0, 0, 0];
+  final List<bool> _badgeShows = [false, false, false, false];
 
   final List<String> _bannerImages = [
     'assets/image/banner.jpg',
@@ -66,7 +73,9 @@ class _MyHomePageState extends State<MyHomePage> {
     });
 
     _searchFocusNode.addListener(() {
-      if (!_searchFocusNode.hasFocus && _isSearching) {
+      // Only set _isSearching to false if we lose focus and are currently searching,
+      // and we are on the explore page. This prevents it from closing if you navigate away.
+      if (!_searchFocusNode.hasFocus && _isSearching && _selectedIndex == 2) {
         setState(() {
           _isSearching = false;
           _searchController.clear();
@@ -75,6 +84,7 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     });
 
+    // Listener for manual page changes on the image slider
     _imageSliderPageController.addListener(() {
       int nextIndex = _imageSliderPageController.page?.round() ?? 0;
       if (_currentImageSliderIndex != nextIndex) {
@@ -84,13 +94,29 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     });
 
+    // Initialize the slider timer for automatic sliding
+    _sliderTimer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
+      if (!mounted) {
+        timer.cancel(); // Stop the timer if the widget is not mounted
+        return;
+      }
+      if (_imageSliderPageController.hasClients) {
+        int nextPage = (_currentImageSliderIndex + 1) % _bannerImages.length;
+        _imageSliderPageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeIn,
+        );
+      }
+    });
+
     // Example: Update badge counts or show badges after some time
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
-          _badgeCounts[1] = 5; // Example: 5 items in cart
+          _badgeCounts[1] = 5; // Example: 5 items in cart (index 1 for cart)
           _badgeShows[1] = true;
-          _badgeCounts[2] = 2; // Example: 2 new explores
+          _badgeCounts[2] = 2; // Example: 2 new explores (index 2 for explore)
           _badgeShows[2] = true;
         });
       }
@@ -103,13 +129,28 @@ class _MyHomePageState extends State<MyHomePage> {
     _searchFocusNode.dispose();
     _mainPageController.dispose();
     _imageSliderPageController.dispose();
+    _sliderTimer?.cancel(); // **CRUCIAL: Cancel the timer to prevent memory leaks**
     super.dispose();
   }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      _mainPageController.jumpToPage(index);
+      // Use animateToPage for a smoother transition
+      _mainPageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+
+      // If we navigate away from Explore, close search and clear text
+      if (index != 2) {
+        _isSearching = false;
+        _searchController.clear();
+        _searchText = "";
+        _searchFocusNode.unfocus();
+      }
+
       switch (index) {
         case 0:
           print('Home tapped');
@@ -120,10 +161,7 @@ class _MyHomePageState extends State<MyHomePage> {
         case 2:
           print('Explore tapped');
           break;
-        case 3:
-          print('Search tapped');
-          break;
-        case 4:
+        case 3: // This is now "Me"
           print('Me tapped');
           break;
       }
@@ -218,7 +256,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(5),
@@ -246,7 +285,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                          padding:
+                          const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                         ),
                         child: const Text('SHOP NOW'),
                       ),
@@ -262,17 +302,23 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine if the search bar should be visible based on the selected index
+    final bool showSearchBar = _selectedIndex == 2; // Only for Explore page
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
-        centerTitle: true,
+        centerTitle: false, // Set to false to allow Expanded/Align to control
         title: Row(
           children: [
+            // Always align 'PHIL' to the left, unless actively searching on the explore page
             Expanded(
               child: AnimatedAlign(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
-                alignment: _isSearching ? Alignment.centerLeft : Alignment.center,
+                alignment: (_isSearching && showSearchBar)
+                    ? Alignment.centerLeft // Align left when searching on explore
+                    : Alignment.centerLeft, // Always align left otherwise
                 child: const Text(
                   'PHIL',
                   style: TextStyle(
@@ -287,13 +333,14 @@ class _MyHomePageState extends State<MyHomePage> {
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOutCubic,
-              width: _isSearching ? 8.0 : 0.0,
+              // Only show the padding if searching AND on the Explore page
+              width: (_isSearching && showSearchBar) ? 8.0 : 0.0,
             ),
             AnimatedSize(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOutCubic,
               alignment: Alignment.centerRight,
-              child: _isSearching
+              child: (_isSearching && showSearchBar)
                   ? Container(
                 width: MediaQuery.of(context).size.width * 0.5,
                 decoration: BoxDecoration(
@@ -324,27 +371,29 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
         actions: [
-          _isSearching
-              ? IconButton(
-            icon: const Icon(Icons.cancel, color: Colors.black),
-            onPressed: () {
-              setState(() {
-                _isSearching = false;
-                _searchController.clear();
-                _searchText = "";
-                _searchFocusNode.unfocus();
-              });
-            },
-          )
-              : IconButton(
-            icon: const Icon(Icons.search, color: Colors.black),
-            onPressed: () {
-              setState(() {
-                _isSearching = true;
-                _searchFocusNode.requestFocus();
-              });
-            },
-          ),
+          // Only show search actions if on the Explore page
+          if (showSearchBar)
+            _isSearching
+                ? IconButton(
+              icon: const Icon(Icons.cancel, color: Colors.black),
+              onPressed: () {
+                setState(() {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _searchText = "";
+                  _searchFocusNode.unfocus();
+                });
+              },
+            )
+                : IconButton(
+              icon: const Icon(Icons.search, color: Colors.black),
+              onPressed: () {
+                setState(() {
+                  _isSearching = true;
+                  _searchFocusNode.requestFocus();
+                });
+              },
+            ),
         ],
       ),
       drawer: Drawer(
@@ -368,6 +417,13 @@ class _MyHomePageState extends State<MyHomePage> {
         onPageChanged: (index) {
           setState(() {
             _selectedIndex = index;
+            // When page changes, if not on explore, reset search state
+            if (index != 2) {
+              _isSearching = false;
+              _searchController.clear();
+              _searchText = "";
+              _searchFocusNode.unfocus();
+            }
           });
         },
         children: [
@@ -375,7 +431,7 @@ class _MyHomePageState extends State<MyHomePage> {
           SingleChildScrollView(
             child: Column(
               children: [
-                if (_searchText.isNotEmpty)
+                if (_searchText.isNotEmpty && _selectedIndex == 0)
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
@@ -431,7 +487,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                         child: Text(
                                           'Error loading image: ${_bannerImages[index]}\nPlease check asset path and pubspec.yaml',
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(color: Colors.red),
+                                          style:
+                                          const TextStyle(color: Colors.red),
                                         ),
                                       );
                                     },
@@ -455,7 +512,8 @@ class _MyHomePageState extends State<MyHomePage> {
                             duration: const Duration(milliseconds: 300),
                             margin: const EdgeInsets.symmetric(horizontal: 4.0),
                             height: 8.0,
-                            width: _currentImageSliderIndex == index ? 24.0 : 8.0,
+                            width:
+                            _currentImageSliderIndex == index ? 24.0 : 8.0,
                             decoration: BoxDecoration(
                               color: _currentImageSliderIndex == index
                                   ? Colors.blueAccent
@@ -542,26 +600,22 @@ class _MyHomePageState extends State<MyHomePage> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-
                             ),
                           ),
                         ),
                       ),
                     ),
-                    // Removed the SizedBox(height: 50) here to cut the extra space
                   ],
                 ),
               ],
             ),
           ),
           // Page 1: Cart Page Content
-          const Center(child: Text("Cart Page Content")),
-          // Page 2: Explore Page Content
-          const Center(child: Text("Explore Page Content")),
-          // Page 3: Search Page Content
-          const Center(child: Text("Search Page Content")),
-          // Page 4: Me Page Content (Profile)
-          const Center(child: Text("Profile Page Content")),
+          const CartPageContent(),
+          // Page 2: Explore Page Content - Pass the search query here
+          ExplorePageContent(searchQuery: _searchText),
+          // Page 3: Me Page Content (Profile) - THIS IS THE CHANGE
+          const ProfilePageContent(), // <--- CHANGE THIS LINE
         ],
       ),
       bottomNavigationBar: CustomNavigationBar(
@@ -588,16 +642,12 @@ class _MyHomePageState extends State<MyHomePage> {
             showBadge: _badgeShows[2],
           ),
           CustomNavigationBarItem(
-            icon: const Icon(Icons.search),
-            title: const Text("Search"),
-            badgeCount: _badgeCounts[3],
-            showBadge: _badgeShows[3],
-          ),
-          CustomNavigationBarItem(
             icon: const Icon(Icons.account_circle),
             title: const Text("Me"),
-            badgeCount: _badgeCounts[4],
-            showBadge: _badgeShows[4],
+            badgeCount:
+            _badgeCounts[3],
+            showBadge:
+            _badgeShows[3],
           ),
         ],
         currentIndex: _selectedIndex,
