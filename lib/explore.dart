@@ -2,38 +2,11 @@ import 'package:flutter/material.dart';
 import 'dart:convert'; // Required for JSON decoding
 import 'package:http/http.dart' as http; // Required for making HTTP requests
 import 'package:provider/provider.dart';
-import 'cart_provider.dart'; // Import the provider
+// Import the provider
+import 'cart_provider.dart';
+import 'models/product.dart'; // Adjust path as needed
 
-// Product Model (can be reused from cart.dart or defined here for self-containment)
-class Product {
-  final int id;
-  final String name;
-  final double price;
-  final String category; // Added category for filtering
-  final String imageUrl;
-  final String description; // Added description for the product view page
 
-  Product({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.category,
-    required this.imageUrl,
-    this.description = 'No description available.', // Default description
-  });
-
-  // Factory constructor to create a Product from a JSON map
-  factory Product.fromJson(Map<String, dynamic> json) {
-    return Product(
-      id: json['id'] as int,
-      name: json['title'] as String,
-      price: (json['price'] as num).toDouble(),
-      category: json['category'] as String,
-      imageUrl: json['image'] as String,
-      description: json['description'] as String? ?? 'No description available.', // Parse description
-    );
-  }
-}
 
 // Product Card Widget for displaying products in the grid
 class ExploreProductCard extends StatelessWidget {
@@ -481,15 +454,11 @@ class ProductViewPage extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // Implement buy logic here
-                        // For now, show a simple snackbar
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('You just clicked "Buy Now" for ${product.name}!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+                        // Add to cart logic (optional)
+                        // Navigate to CartPage
+                        Navigator.pushNamed(context, '/cart');
                       },
+
                       icon: const Icon(Icons.shopping_cart),
                       label: const Text('Buy Now', style: TextStyle(fontSize: 18)),
                       style: ElevatedButton.styleFrom(

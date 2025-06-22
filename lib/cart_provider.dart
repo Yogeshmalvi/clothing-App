@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'cart.dart';
+import 'models/product.dart'; // Adjust path as needed
+
 // Your product model
 
 class CartItem {
