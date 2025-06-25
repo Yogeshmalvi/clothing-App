@@ -454,10 +454,20 @@ class ProductViewPage extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // Add to cart logic (optional)
-                        // Navigate to CartPage
-                        Navigator.pushNamed(context, '/cart');
+                        // Add product to cart using the provider
+                        final cartProvider = Provider.of<CartProvider>(context, listen: false);
+                        cartProvider.addToCart(product);
+
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Product was added'),
+                            duration: Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
                       },
+
 
                       icon: const Icon(Icons.shopping_cart),
                       label: const Text('Buy Now', style: TextStyle(fontSize: 18)),

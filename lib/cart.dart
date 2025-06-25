@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'models/product.dart'; // Make sure the path is correct
+import 'package:provider/provider.dart';
+import 'models/product.dart';
+import 'cart_provider.dart'; // Make sure the path is correct
 
 // ------------------ Cart Item Model ------------------
 class CartItem {
@@ -36,11 +38,8 @@ class CartPageContent extends StatefulWidget {
 }
 
 class _CartPageContentState extends State<CartPageContent> {
-  final List<CartItem> _cartItems = [];
-
-  double get _totalPrice => _cartItems.fold(0.0, (sum, item) => sum + item.total);
-
   void _removeFromCart(int productIdToRemove) {
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -53,30 +52,25 @@ class _CartPageContentState extends State<CartPageContent> {
           ),
           ElevatedButton(
             onPressed: () {
-              setState(() {
-                _cartItems.removeWhere((item) => item.product.id == productIdToRemove);
-              });
+              cartProvider.removeFromCartById(productIdToRemove);
               Navigator.of(context).pop();
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Remove', style: TextStyle(color: Colors.white)),
-          )
+          ),
         ],
       ),
     );
   }
 
   void _updateQuantity(int productId, int newQuantity) {
-    setState(() {
-      final index = _cartItems.indexWhere((item) => item.product.id == productId);
-      if (index != -1) {
-        _cartItems[index].quantity = newQuantity.clamp(1, 999);
-      }
-    });
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    cartProvider.updateQuantity(productId, newQuantity);
   }
 
   void _handleCheckout() {
-    if (_cartItems.isEmpty) {
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    if (cartProvider.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cart is empty.')),
       );
@@ -87,15 +81,15 @@ class _CartPageContentState extends State<CartPageContent> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Checkout'),
-        content: Text('Total: \$${_totalPrice.toStringAsFixed(2)}'),
+        content: Text('Total: \$${cartProvider.totalPrice.toStringAsFixed(2)}'),
         actions: [
           TextButton(
             onPressed: () {
-              setState(() => _cartItems.clear());
+              cartProvider.clearCart();
               Navigator.of(context).pop();
             },
             child: const Text('OK'),
-          )
+          ),
         ],
       ),
     );
@@ -103,6 +97,9 @@ class _CartPageContentState extends State<CartPageContent> {
 
   @override
   Widget build(BuildContext context) {
+    final cartProvider = Provider.of<CartProvider>(context);
+    final cartItems = cartProvider.items;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -116,7 +113,7 @@ class _CartPageContentState extends State<CartPageContent> {
             ),
           ),
           const SizedBox(height: 16),
-          _cartItems.isEmpty
+          cartItems.isEmpty
               ? const Center(
             child: Padding(
               padding: EdgeInsets.all(50),
@@ -127,9 +124,9 @@ class _CartPageContentState extends State<CartPageContent> {
               : ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _cartItems.length,
+            itemCount: cartItems.length,
             itemBuilder: (context, index) {
-              final item = _cartItems[index];
+              final item = cartItems[index];
               return CartItemWidget(
                 item: item,
                 onUpdateQuantity: _updateQuantity,
@@ -138,7 +135,7 @@ class _CartPageContentState extends State<CartPageContent> {
             },
           ),
           const SizedBox(height: 20),
-          if (_cartItems.isNotEmpty)
+          if (cartItems.isNotEmpty)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -159,13 +156,15 @@ class _CartPageContentState extends State<CartPageContent> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Total:',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                       Text(
-                        '\$${_totalPrice.toStringAsFixed(2)}',
+                        '\$${cartProvider.totalPrice.toStringAsFixed(2)}',
                         style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.indigo),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo,
+                        ),
                       ),
                     ],
                   ),
@@ -182,10 +181,14 @@ class _CartPageContentState extends State<CartPageContent> {
                         ),
                       ),
                       child: const Text('Checkout',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold,color: Colors.white),
                     ),
                   ),
-                ],
+
+
+              ),
+                  ],
               ),
             ),
         ],
@@ -194,25 +197,30 @@ class _CartPageContentState extends State<CartPageContent> {
   }
 }
 
-// ------------------ Cart Item UI ------------------
+// ------------------ Cart Item Widget ------------------
 class CartItemWidget extends StatelessWidget {
   final CartItem item;
-  final Function(int, int) onUpdateQuantity;
-  final Function(int) onRemove;
+  final Function(int productId, int newQuantity) onUpdateQuantity;
+  final Function(int productId) onRemove;
 
   const CartItemWidget({
-    super.key,
+    Key? key,
     required this.item,
     required this.onUpdateQuantity,
     required this.onRemove,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 5),
       child: ListTile(
-        leading: Image.network(item.product.imageUrl, width: 50, height: 50, fit: BoxFit.cover),
+        leading: Image.network(
+          item.product.imageUrl,
+          width: 50,
+          height: 50,
+          fit: BoxFit.cover,
+        ),
         title: Text(item.product.name),
         subtitle: Row(
           children: [
@@ -228,15 +236,23 @@ class CartItemWidget extends StatelessWidget {
           ],
         ),
         trailing: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('\$${item.total.toStringAsFixed(2)}'),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () => onRemove(item.product.id),
+            Text(
+              '\$${item.total.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => onRemove(item.product.id),
+              child: const Icon(Icons.delete, color: Colors.red, size: 20),
             ),
           ],
         ),
+
+
+
       ),
     );
   }

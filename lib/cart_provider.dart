@@ -1,14 +1,6 @@
 import 'package:flutter/material.dart';
-import 'models/product.dart'; // Adjust path as needed
-
-// Your product model
-
-class CartItem {
-  final Product product;
-  int quantity;
-
-  CartItem({required this.product, this.quantity = 1});
-}
+import 'models/product.dart';
+import 'cart.dart';
 
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
@@ -18,14 +10,22 @@ class CartProvider extends ChangeNotifier {
   void addToCart(Product product) {
     final index = _items.indexWhere((item) => item.product.id == product.id);
     if (index != -1) {
-      _items[index].quantity++;
+      _items[index].quantity += 1;
     } else {
       _items.add(CartItem(product: product));
     }
     notifyListeners();
   }
 
-  void removeFromCart(int productId) {
+  void updateQuantity(int productId, int newQuantity) {
+    final index = _items.indexWhere((item) => item.product.id == productId);
+    if (index != -1) {
+      _items[index].quantity = newQuantity.clamp(1, 999);
+      notifyListeners();
+    }
+  }
+
+  void removeFromCartById(int productId) {
     _items.removeWhere((item) => item.product.id == productId);
     notifyListeners();
   }
@@ -35,5 +35,6 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  double get total => _items.fold(0, (sum, item) => sum + item.product.price * item.quantity);
+  double get totalPrice =>
+      _items.fold(0, (total, item) => total + item.total);
 }
